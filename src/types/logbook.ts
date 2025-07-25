@@ -24,7 +24,7 @@ export interface OCRResponse {
   rawText: string;
   processing: boolean;
   error?: string;
-  structuredData?: any; // Azure OCR structured response with bounding boxes
+  structuredData?: unknown; // Azure/AWS OCR structured response with bounding boxes
 }
 
 export interface CameraCapture {

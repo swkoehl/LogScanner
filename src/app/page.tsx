@@ -4,12 +4,16 @@ import { useState } from 'react';
 import { Camera, FileText, Download, Plane } from 'lucide-react';
 import CameraCapture from '@/components/camera/CameraCapture';
 import DataReview from '@/components/data-review/DataReview';
+import MobileShare from '@/components/mobile-share/MobileShare';
 import type { FlightLogEntry } from '@/types/logbook';
 
 export default function Home() {
   const [currentStep, setCurrentStep] = useState<'capture' | 'review' | 'export'>('capture');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<FlightLogEntry[]>([]);
+  
+  // Get the current URL for mobile sharing
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
 
   const handleImageCapture = (imageData: string) => {
     setCapturedImage(imageData);
@@ -122,6 +126,9 @@ export default function Home() {
       <div className="text-center text-xs text-gray-500">
         <p>Secure processing • No data stored • Privacy first</p>
       </div>
+
+      {/* Mobile Share Component */}
+      <MobileShare appUrl={appUrl} />
     </div>
   );
 }
