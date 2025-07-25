@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, Download, Loader2 } from 'lucide-react';
-import { processImageOCR, parseLogbookData } from '@/lib/azure-ocr';
+import { parseLogbookData } from '@/lib/azure-ocr';
+import { parseLogbookDataTextract } from '@/lib/aws-textract';
 import { generateCSV, downloadCSV, validateLogbookEntries } from '@/lib/csv-export';
 import type { FlightLogEntry } from '@/types/logbook';
+import { config } from '@/lib/config';
 
 interface DataReviewProps {
   imageData: string;
@@ -16,20 +18,45 @@ export default function DataReview({ imageData, onDataConfirm, onBack }: DataRev
   const [extractedData, setExtractedData] = useState<FlightLogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ocrProvider, setOcrProvider] = useState<'aws' | 'azure'>(config.app.ocrProvider as 'aws' | 'azure');
 
   const processImage = useCallback(async () => {
     setIsProcessing(true);
     setError(null);
 
     try {
-      const ocrResult = await processImageOCR(imageData);
+      // Call the API route instead of direct library calls
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          imageData,
+          provider: ocrProvider 
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'OCR API request failed');
+      }
+
+      const ocrResult = await response.json();
       
       if (ocrResult.error) {
         setError(ocrResult.error);
         return;
       }
 
-      const parsedData = parseLogbookData(ocrResult.rawText, ocrResult.structuredData);
+      // Use the appropriate parser based on provider
+      let parsedData;
+      if (ocrProvider === 'aws') {
+        parsedData = parseLogbookDataTextract(ocrResult.rawText, ocrResult.structuredData);
+      } else {
+        parsedData = parseLogbookData(ocrResult.rawText, ocrResult.structuredData);
+      }
+
       const entriesWithIds = parsedData.map((entry, index) => ({
         id: `entry-${index}`,
         date: entry.date || '',
@@ -50,7 +77,7 @@ export default function DataReview({ imageData, onDataConfirm, onBack }: DataRev
     } finally {
       setIsProcessing(false);
     }
-  }, [imageData]);
+  }, [imageData, ocrProvider]);
 
   useEffect(() => {
     processImage();
@@ -145,8 +172,27 @@ export default function DataReview({ imageData, onDataConfirm, onBack }: DataRev
             <p className="text-lg font-semibold text-gray-800">Edit any incorrect information before exporting</p>
           </div>
         </div>
-        <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-          {extractedData.length} entries found
+        <div className="flex items-center space-x-3">
+          <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+            {extractedData.length} entries found
+          </div>
+          <div className="flex items-center space-x-2">
+            <label className="text-sm font-medium text-gray-700">OCR:</label>
+            <select
+              value={ocrProvider}
+              onChange={(e) => setOcrProvider(e.target.value as 'aws' | 'azure')}
+              className="text-sm border border-gray-300 rounded px-2 py-1"
+            >
+              <option value="aws">AWS Textract</option>
+              <option value="azure">Azure OCR</option>
+            </select>
+            <button
+              onClick={processImage}
+              className="text-sm bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded transition-colors"
+            >
+              Reprocess
+            </button>
+          </div>
         </div>
       </div>
 

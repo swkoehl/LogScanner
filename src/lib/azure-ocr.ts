@@ -109,11 +109,11 @@ export async function processImageOCR(imageData: string): Promise<OCRResponse> {
 }
 
 // Parse logbook data from OCR text with improved structure understanding
-export function parseLogbookData(ocrText: string, structuredData?: any): Partial<import('@/types/logbook').FlightLogEntry>[] {
+export function parseLogbookData(ocrText: string, structuredData?: unknown): Partial<import('@/types/logbook').FlightLogEntry>[] {
   // Try structured parsing first if we have bounding box data
-  if (structuredData?.readResults) {
+  if (structuredData && typeof structuredData === 'object' && 'readResults' in structuredData) {
     console.log('🎯 Using structured parsing with bounding box data');
-    const structuredEntries = parseLogbookWithStructuralAwareness(structuredData);
+    const structuredEntries = parseLogbookWithStructuralAwareness(structuredData as { readResults?: unknown[] });
     if (structuredEntries.length > 0) {
       return structuredEntries;
     }
@@ -143,14 +143,19 @@ export function parseLogbookData(ocrText: string, structuredData?: any): Partial
 }
 
 // Enhanced structural parsing using bounding box data
-function parseLogbookWithStructuralAwareness(ocrResult: any): Partial<import('@/types/logbook').FlightLogEntry>[] {
+function parseLogbookWithStructuralAwareness(ocrResult: { readResults?: unknown[] }): Partial<import('@/types/logbook').FlightLogEntry>[] {
   const entries: Partial<import('@/types/logbook').FlightLogEntry>[] = [];
   
   for (const page of ocrResult.readResults || []) {
-    const lines = page.lines || [];
+    const pageData = page as { lines?: unknown[] };
+    const lines = pageData.lines || [];
     
     // Sort lines by vertical position (top to bottom) to process rows
-    const sortedLines = lines.sort((a: any, b: any) => a.boundingBox[1] - b.boundingBox[1]);
+    const sortedLines = lines.sort((a: unknown, b: unknown) => {
+      const aBox = (a as { boundingBox?: number[] }).boundingBox?.[1] || 0;
+      const bBox = (b as { boundingBox?: number[] }).boundingBox?.[1] || 0;
+      return aBox - bBox;
+    });
     
     // Group lines that are roughly at the same vertical level (same row)
     const rows = groupLinesByRow(sortedLines);
@@ -168,16 +173,18 @@ function parseLogbookWithStructuralAwareness(ocrResult: any): Partial<import('@/
 }
 
 // Group lines that appear to be in the same row
-function groupLinesByRow(lines: any[]): any[][] {
-  const rows: any[][] = [];
+function groupLinesByRow(lines: unknown[]): unknown[][] {
+  const rows: unknown[][] = [];
   const rowThreshold = 20; // Pixels - adjust based on typical line height
   
   for (const line of lines) {
-    const lineY = line.boundingBox[1]; // Top Y coordinate
+    const lineData = line as { boundingBox?: number[] };
+    const lineY = lineData.boundingBox?.[1] || 0; // Top Y coordinate
     
     // Find existing row that this line belongs to
     const existingRow = rows.find(row => {
-      const rowY = row[0].boundingBox[1];
+      const rowData = row[0] as { boundingBox?: number[] };
+      const rowY = rowData.boundingBox?.[1] || 0;
       return Math.abs(lineY - rowY) < rowThreshold;
     });
     
@@ -190,25 +197,32 @@ function groupLinesByRow(lines: any[]): any[][] {
   
   // Sort each row by X position (left to right)
   rows.forEach(row => {
-    row.sort((a, b) => a.boundingBox[0] - b.boundingBox[0]);
+    row.sort((a, b) => {
+      const aData = a as { boundingBox?: number[] };
+      const bData = b as { boundingBox?: number[] };
+      const aX = aData.boundingBox?.[0] || 0;
+      const bX = bData.boundingBox?.[0] || 0;
+      return aX - bX;
+    });
   });
   
   return rows;
 }
 
 // Parse a single row of logbook data using column positions
-function parseLogbookRow(rowLines: any[]): Partial<import('@/types/logbook').FlightLogEntry> | null {
+function parseLogbookRow(rowLines: unknown[]): Partial<import('@/types/logbook').FlightLogEntry> | null {
   const entry: Partial<import('@/types/logbook').FlightLogEntry> = {};
   
   // Analyze each word/line in the row based on its X position
   for (const line of rowLines) {
-    const x = line.boundingBox[0]; // Left X coordinate
-    const text = line.text.trim();
-    const words = line.words || [{ text, boundingBox: line.boundingBox }];
+    const lineData = line as { boundingBox?: number[]; text?: string; words?: unknown[] };
+    const text = lineData.text?.trim() || '';
+    const words = lineData.words || [{ text, boundingBox: lineData.boundingBox }];
     
     for (const word of words) {
-      const wordX = word.boundingBox[0];
-      const wordText = word.text.trim();
+      const wordData = word as { boundingBox?: number[]; text?: string };
+      const wordX = wordData.boundingBox?.[0] || 0;
+      const wordText = wordData.text?.trim() || '';
       
       // Column detection based on typical logbook layout
       // These thresholds may need adjustment based on your specific logbook format
