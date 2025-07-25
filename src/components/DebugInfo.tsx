@@ -1,24 +1,26 @@
 'use client';
 
-import { azureConfig, validateAzureConfig } from '@/lib/azure-config';
+import { awsConfig, validateAwsConfig } from '@/lib/aws-config';
 
 export default function DebugInfo() {
   // Force validation check
-  const isConfigured = validateAzureConfig();
+  const isConfigured = validateAwsConfig();
   
   return (
     <div className="p-4 bg-gray-100 rounded-lg text-sm">
       <h3 className="font-bold mb-2">Debug Information</h3>
       
       <div className="space-y-1">
-        <div>Azure Config Valid: {isConfigured ? 'YES' : 'NO'}</div>
-        <div>Endpoint Available: {azureConfig.endpoint ? 'YES' : 'NO'}</div>  
-        <div>Key Available: {azureConfig.key ? 'YES' : 'NO'}</div>
+        <div>AWS Config Valid: {isConfigured ? 'YES' : 'NO'}</div>
+        <div>Access Key Available: {awsConfig.accessKeyId ? 'YES' : 'NO'}</div>  
+        <div>Secret Key Available: {awsConfig.secretAccessKey ? 'YES' : 'NO'}</div>
+        <div>Region: {awsConfig.region}</div>
         
         {/* Show actual values (first few chars only for security) */}
         <div className="text-xs text-gray-600 mt-2">
-          <div>Endpoint: {azureConfig.endpoint ? `${azureConfig.endpoint.substring(0, 30)}...` : 'undefined'}</div>
-          <div>Key: {azureConfig.key ? `${azureConfig.key.substring(0, 8)}...` : 'undefined'}</div>
+          <div>Access Key: {awsConfig.accessKeyId ? `${awsConfig.accessKeyId.substring(0, 8)}...` : 'undefined'}</div>
+          <div>Secret Key: {awsConfig.secretAccessKey ? `${awsConfig.secretAccessKey.substring(0, 8)}...` : 'undefined'}</div>
+          <div>Region: {awsConfig.region}</div>
         </div>
         
         {/* Show all environment variables starting with NEXT_PUBLIC_ */}

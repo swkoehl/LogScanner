@@ -1,104 +1,79 @@
-// Azure Computer Vision OCR integration for LogScanner MVP
+// AWS Textract OCR integration for LogScanner
+// Replaces Azure Computer Vision with AWS Textract for document text extraction
 
-import { azureConfig, validateAzureConfig } from './azure-config';
+import { TextractClient, DetectDocumentTextCommand, AnalyzeDocumentCommand, Block } from '@aws-sdk/client-textract';
+import { awsConfig, validateAwsConfig } from './aws-config';
 import type { OCRResponse, OCRResult } from '@/types/logbook';
 
-// Initialize Azure Computer Vision client
-async function initializeOCRClient() {
-  validateAzureConfig();
+// Initialize AWS Textract client
+async function initializeTextractClient() {
+  validateAwsConfig();
   
-  // Use REST API approach for better browser compatibility
-  return {
-    endpoint: azureConfig.endpoint,
-    key: azureConfig.key,
-  };
+  return new TextractClient({
+    region: awsConfig.region,
+    credentials: {
+      accessKeyId: awsConfig.accessKeyId!,
+      secretAccessKey: awsConfig.secretAccessKey!,
+    },
+  });
 }
 
-// Process image with Azure Computer Vision Read API
+// Process image with AWS Textract
 export async function processImageOCR(imageData: string): Promise<OCRResponse> {
   try {
-    const client = await initializeOCRClient();
+    const client = await initializeTextractClient();
     
-    // Convert base64 to blob
+    // Convert base64 to buffer
     const base64Data = imageData.split(',')[1];
-    const binaryData = atob(base64Data);
-    const bytes = new Uint8Array(binaryData.length);
-    for (let i = 0; i < binaryData.length; i++) {
-      bytes[i] = binaryData.charCodeAt(i);
-    }
+    const buffer = Buffer.from(base64Data, 'base64');
     
-    // Submit image for analysis
-    const submitResponse = await fetch(`${client.endpoint}/vision/v3.2/read/analyze`, {
-      method: 'POST',
-      headers: {
-        'Ocp-Apim-Subscription-Key': client.key,
-        'Content-Type': 'application/octet-stream',
-      } as HeadersInit,
-      body: bytes,
+    // Use AnalyzeDocument for better table/form detection which is useful for logbooks
+    const command = new AnalyzeDocumentCommand({
+      Document: {
+        Bytes: buffer,
+      },
+      FeatureTypes: ['TABLES', 'FORMS'], // Enhanced features for structured data
     });
     
-    if (!submitResponse.ok) {
-      throw new Error(`OCR submission failed: ${submitResponse.statusText}`);
-    }
+    const response = await client.send(command);
     
-    // Get operation location for polling
-    const operationLocation = submitResponse.headers.get('Operation-Location');
-    if (!operationLocation) {
-      throw new Error('No operation location returned from OCR service');
-    }
-    
-    // Poll for results
-    let result;
-    let attempts = 0;
-    const maxAttempts = 30; // 30 seconds max
-    
-    do {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-      
-      const resultResponse = await fetch(operationLocation, {
-        headers: {
-          'Ocp-Apim-Subscription-Key': client.key,
-        } as HeadersInit,
-      });
-      
-      if (!resultResponse.ok) {
-        throw new Error(`OCR result fetch failed: ${resultResponse.statusText}`);
-      }
-      
-      result = await resultResponse.json();
-      attempts++;
-    } while (result.status === 'running' && attempts < maxAttempts);
-    
-    if (result.status !== 'succeeded') {
-      throw new Error(`OCR processing failed with status: ${result.status}`);
+    if (!response.Blocks) {
+      throw new Error('No text blocks returned from Textract');
     }
     
     // Process results
     const ocrResults: OCRResult[] = [];
     let rawText = '';
     
-    if (result.analyzeResult?.readResults) {
-      for (const page of result.analyzeResult.readResults) {
-        for (const line of page.lines || []) {
-          ocrResults.push({
-            text: line.text,
-            confidence: line.appearance?.style?.confidence || 0.8,
-            boundingBox: line.boundingBox || [],
-          });
-          rawText += line.text + '\n';
-        }
+    // Extract text lines with confidence and bounding boxes
+    const textBlocks = response.Blocks.filter(block => block.BlockType === 'LINE');
+    
+    for (const block of textBlocks) {
+      if (block.Text && block.Confidence && block.Geometry?.BoundingBox) {
+        const boundingBox = convertBoundingBox(block.Geometry.BoundingBox);
+        
+        ocrResults.push({
+          text: block.Text,
+          confidence: block.Confidence / 100, // Convert to 0-1 scale
+          boundingBox: boundingBox,
+        });
+        
+        rawText += block.Text + '\n';
       }
     }
+    
+    // Extract structured data for enhanced parsing
+    const structuredData = extractStructuredData(response.Blocks);
     
     return {
       results: ocrResults,
       rawText: rawText.trim(),
       processing: false,
-      structuredData: result.analyzeResult, // Pass structured data for enhanced parsing
+      structuredData: structuredData,
     };
     
   } catch (error) {
-    console.error('OCR processing error:', error);
+    console.error('Textract processing error:', error);
     return {
       results: [],
       rawText: '',
@@ -106,6 +81,77 @@ export async function processImageOCR(imageData: string): Promise<OCRResponse> {
       error: error instanceof Error ? error.message : 'Unknown OCR error',
     };
   }
+}
+
+// Convert AWS bounding box format to our standard format
+function convertBoundingBox(bbox: any): number[] {
+  // AWS returns normalized coordinates (0-1), convert to pixel-like coordinates
+  // Multiply by 1000 to get reasonable numbers for our parsing logic
+  const width = 1000;
+  const height = 1000;
+  
+  return [
+    bbox.Left * width,      // x
+    bbox.Top * height,      // y
+    bbox.Width * width,     // width
+    bbox.Height * height,   // height
+  ];
+}
+
+// Extract structured data from Textract blocks for enhanced parsing
+function extractStructuredData(blocks: Block[]) {
+  const structuredData = {
+    readResults: [{
+      lines: [] as any[]
+    }]
+  };
+  
+  // Process LINE blocks to maintain compatibility with Azure format
+  const lineBlocks = blocks.filter(block => block.BlockType === 'LINE');
+  
+  for (const block of lineBlocks) {
+    if (block.Text && block.Geometry?.BoundingBox) {
+      const boundingBox = convertBoundingBox(block.Geometry.BoundingBox);
+      
+      structuredData.readResults[0].lines.push({
+        text: block.Text,
+        boundingBox: boundingBox,
+        words: extractWordsFromLine(block, blocks),
+        appearance: {
+          style: {
+            confidence: (block.Confidence || 80) / 100
+          }
+        }
+      });
+    }
+  }
+  
+  return structuredData;
+}
+
+// Extract word-level data from a line block
+function extractWordsFromLine(lineBlock: Block, allBlocks: Block[]) {
+  const words: any[] = [];
+  
+  // Find WORD blocks that belong to this line
+  if (lineBlock.Relationships) {
+    for (const relationship of lineBlock.Relationships) {
+      if (relationship.Type === 'CHILD' && relationship.Ids) {
+        for (const childId of relationship.Ids) {
+          const wordBlock = allBlocks.find(block => block.Id === childId && block.BlockType === 'WORD');
+          if (wordBlock && wordBlock.Text && wordBlock.Geometry?.BoundingBox) {
+            words.push({
+              text: wordBlock.Text,
+              boundingBox: convertBoundingBox(wordBlock.Geometry.BoundingBox),
+              confidence: (wordBlock.Confidence || 80) / 100
+            });
+          }
+        }
+      }
+    }
+  }
+  
+  return words;
 }
 
 // Parse logbook data from OCR text with improved structure understanding

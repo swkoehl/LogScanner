@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, Download, Loader2 } from 'lucide-react';
-import { processImageOCR, parseLogbookData } from '@/lib/azure-ocr';
+import { processImageOCR, parseLogbookData } from '@/lib/aws-textract';
 import { generateCSV, downloadCSV, validateLogbookEntries } from '@/lib/csv-export';
 import type { FlightLogEntry } from '@/types/logbook';
 

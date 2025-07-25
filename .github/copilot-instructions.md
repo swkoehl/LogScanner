@@ -1,13 +1,13 @@
-# GitHub Copilot Development Instructions for LogScanner MVP
+# GitHub Copilot Development Instructions for LogScanner AWS Edition
 
-> **Context**: This project was developed from extensive planning documents focusing on creating a streamlined MVP for converting handwritten pilot logbooks to ForeFlight-compatible CSV files.
+> **Context**: This project was migrated from Azure to AWS, focusing on creating a streamlined OCR solution for converting handwritten pilot logbooks to ForeFlight-compatible CSV files using AWS Textract.
 
 ## 🎯 **Primary Development Principles**
 
 1. **Mobile-First**: All UI components must work seamlessly on mobile devices
 2. **PWA-Optimized**: Progressive Web App with offline capabilities
 3. **TypeScript Strict**: Type safety throughout the entire codebase
-4. **Azure Computer Vision**: Primary OCR service for handwriting recognition
+4. **AWS Textract**: Primary OCR service with enhanced table/form detection
 5. **Security by Design**: Environment variables in `.env.local` (never committed)
 6. **Performance**: Fast camera capture and OCR processing
 7. **User Experience**: Intuitive interface for pilots
@@ -17,36 +17,37 @@
 ### Local Development
 ```bash
 # .env.local (NEVER commit this file)
-AZURE_COMPUTER_VISION_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
-AZURE_COMPUTER_VISION_KEY=your-secret-key-here
+NEXT_PUBLIC_AWS_ACCESS_KEY_ID=your-access-key-id
+NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY=your-secret-access-key
+NEXT_PUBLIC_AWS_REGION=us-east-1
 NEXT_PUBLIC_APP_ENV=development
 ```
 
 ### Secure Configuration
 ```typescript
-// lib/config.ts
-export const config = {
-  azure: {
-    endpoint: process.env.AZURE_COMPUTER_VISION_ENDPOINT!,
-    key: process.env.AZURE_COMPUTER_VISION_KEY!,
-  }
+// lib/aws-config.ts
+export const awsConfig = {
+  accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID!,
+  secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY!,
+  region: process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1',
 } as const;
 
 // Validate at runtime
-if (!config.azure.endpoint || !config.azure.key) {
-  throw new Error('Missing Azure Computer Vision credentials');
+if (!awsConfig.accessKeyId || !awsConfig.secretAccessKey) {
+  throw new Error('Missing AWS credentials');
 }
 ```
 
-### Azure MCP Server
-- Use Azure MCP server for enhanced development experience
-- Monitor API costs and performance during development
-- Get security recommendations for Azure resources
+### AWS Best Practices
+- Use IAM roles in production instead of access keys
+- Follow principle of least privilege for permissions
+- Monitor AWS costs and usage through CloudWatch
+- Rotate access keys regularly
 
 ## 🛠️ **Technology Stack Guidelines**
 
 ### Frontend Framework
-- **Next.js 14** with App Router
+- **Next.js 15** with App Router
 - **TypeScript** with strict mode enabled
 - **Tailwind CSS** for styling
 - **Shadcn/ui** for component library
@@ -55,9 +56,9 @@ if (!config.azure.endpoint || !config.azure.key) {
 ### Key Dependencies
 ```json
 {
-  "next": "^14.0.0",
-  "@azure/cognitiveservices-computervision": "latest",
-  "tailwindcss": "latest",
+  "next": "15.4.3",
+  "@aws-sdk/client-textract": "^3.670.0",
+  "tailwindcss": "^4",
   "@radix-ui/react-*": "latest",
   "lucide-react": "latest"
 }
@@ -69,140 +70,133 @@ src/
 ├── app/
 │   ├── layout.tsx
 │   ├── page.tsx
-│   ├── camera/
-│   ├── review/
-│   └── export/
+│   ├── api/ocr/
+│   └── components/
 ├── components/
 │   ├── ui/
 │   ├── camera/
-│   ├── ocr/
-│   └── data-review/
+│   ├── data-review/
+│   └── DebugInfo.tsx
 ├── lib/
-│   ├── azure-ocr.ts
+│   ├── aws-textract.ts
+│   ├── aws-config.ts
 │   ├── csv-export.ts
-│   └── data-parser.ts
+│   └── utils.ts
 └── types/
     └── logbook.ts
 ```
 
-## 📱 **Core Components to Build**
+## 📱 **Core Components**
 
 ### 1. Camera Capture Component
 ```typescript
-// Features needed:
+// Features:
 - Mobile camera access via navigator.mediaDevices
 - Image capture and compression
 - Preview and retake functionality
-- Optimal image quality for OCR
+- Optimal image quality for OCR processing
 ```
 
-### 2. Azure OCR Integration
+### 2. AWS Textract Integration
 ```typescript
-// OCR Service requirements:
-- Azure Computer Vision Read API
-- Handwriting recognition mode
-- Confidence scoring for extracted text
-- Error handling for failed requests
+// OCR Service features:
+- AWS Textract AnalyzeDocument API
+- Table and form detection capabilities
+- Enhanced handwriting recognition
+- Confidence scoring and bounding boxes
+- Synchronous processing (no polling required)
 ```
 
-### 3. Data Extraction & Parsing
+### 3. Enhanced Data Extraction
 ```typescript
-// Logbook field recognition:
-- Date patterns (MM/DD/YYYY, DD/MM/YYYY)
-- Aircraft registration (N-numbers)
-- Time formats (decimal hours: 1.5, 2.3)
-- Route patterns (KPAO-KSQL)
-- Numeric landing counts
+// Improved logbook recognition:
+- Structural document understanding
+- Column-aware parsing using bounding boxes
+- Better table detection for logbook layouts
+- Aircraft type normalization
+- Route pattern recognition (KPAO-KSQL)
 ```
 
 ### 4. Data Review Interface
 ```typescript
 // User editing capabilities:
-- Field-by-field validation
-- Easy correction of OCR mistakes
-- Visual feedback for confidence levels
-- Save/restore draft functionality
+- Field-by-field validation and editing
+- Visual confidence indicators
+- Real-time CSV preview
+- Save/restore functionality
 ```
 
-### 5. CSV Export
+### 5. ForeFlight CSV Export
 ```typescript
-// ForeFlight compatibility:
-- Exact column headers required
-- Proper date formatting
-- Decimal time conversion
-- Download trigger functionality
+// Export features:
+- ForeFlight-compatible format
+- Proper date and time formatting
+- Validation before export
+- Direct download functionality
 ```
 
 ## 🎨 **UI/UX Guidelines**
 
 ### Mobile-First Design
-- Touch-friendly buttons (minimum 44px)
-- Large, clear typography
+- Touch-friendly interface (44px minimum touch targets)
+- Clear typography and high contrast
 - Intuitive gesture support
-- Landscape and portrait orientation
+- Responsive for all device sizes
 
-### Color Scheme
-- Aviation-inspired blues and whites
-- High contrast for readability
-- Clear success/error states
-- Professional appearance
+### Aviation Theme
+- Professional blue and white color scheme
+- Airplane iconography (Lucide icons)
+- Clean, pilot-friendly interface
+- Clear status indicators
 
-### Component Patterns
+### Progressive Enhancement
+- Works without JavaScript for basic functionality
+- Enhanced features with JavaScript enabled
+- Graceful degradation for older browsers
+
+## 🔧 **AWS Textract Implementation**
+
+### Setup and Configuration
 ```typescript
-// Use consistent patterns:
-- Loading states for OCR processing
-- Error boundaries for failed operations
-- Toast notifications for user feedback
-- Progressive disclosure for complex features
+import { TextractClient, AnalyzeDocumentCommand } from '@aws-sdk/client-textract';
+
+const client = new TextractClient({
+  region: awsConfig.region,
+  credentials: {
+    accessKeyId: awsConfig.accessKeyId,
+    secretAccessKey: awsConfig.secretAccessKey,
+  },
+});
 ```
 
-## 🔧 **Key Development Areas**
-
-### Camera Integration
+### Document Analysis
 ```typescript
-// Implementation focus:
-- HTTPS requirement for camera access
-- Image compression for faster OCR
-- Multiple format support (JPEG, PNG)
-- Error handling for permission denial
+// Enhanced OCR with table detection
+const command = new AnalyzeDocumentCommand({
+  Document: { Bytes: imageBuffer },
+  FeatureTypes: ['TABLES', 'FORMS'], // Key improvement over Azure
+});
 ```
 
-### OCR Processing
+### Data Processing
 ```typescript
-// Azure Computer Vision setup:
-- Async/await pattern for API calls
-- Retry logic for failed requests
-- Progress indicators for long operations
-- Local caching for processed results
+// Process Textract blocks for structured extraction
+- LINE blocks for text content
+- WORD blocks for precise positioning
+- TABLE blocks for structured data
+- Bounding box coordinates for column detection
 ```
 
-### Data Validation
-```typescript
-// Logbook data validation:
-- Date range checking (realistic flight dates)
-- Time format validation (decimal hours)
-- Aircraft registration format (FAA standards)
-- Route format (airport identifiers)
-```
+## 📊 **Enhanced Data Models**
 
-### Performance Optimization
-```typescript
-// Key areas:
-- Image compression before OCR
-- Debounced user input
-- Lazy loading of components
-- Efficient re-renders
-```
-
-## 📊 **Data Models**
-
-### Core Types
+### Core Types (Updated)
 ```typescript
 interface FlightLogEntry {
+  id?: string;
   date: string;           // YYYY-MM-DD format
-  aircraftId: string;     // Registration number
+  aircraftId: string;     // Registration number (N-number)
   aircraftType: string;   // C172, PA28, etc.
-  route: string;          // KPAO-KSQL
+  route: string;          // KPAO-KSQL format
   totalTime: number;      // Decimal hours
   picTime?: number;       // Pilot in Command time
   dualTime?: number;      // Dual instruction time
@@ -210,63 +204,91 @@ interface FlightLogEntry {
   confidence?: number;    // OCR confidence (0-1)
 }
 
-interface OCRResult {
-  text: string;
-  confidence: number;
-  boundingBox: number[];
+interface OCRResponse {
+  results: OCRResult[];
+  rawText: string;
+  processing: boolean;
+  error?: string;
+  structuredData?: any; // AWS Textract structured response
 }
 ```
 
-## 🚀 **MVP Feature Prioritization**
+## 🚀 **Migration Benefits**
 
-### Must-Have
-1. Camera capture working on mobile
-2. Basic Azure OCR integration
-3. Simple data display
+### Technical Improvements
+- **Better Table Detection**: Enhanced logbook column recognition
+- **Single API Call**: No polling required (vs Azure's async model)
+- **Form Detection**: Better structured document understanding
+- **Cost Efficiency**: 1K pages free monthly vs Azure's transaction limits
 
-### Should-Have
-1. Data editing interface
-2. Field validation
-3. CSV generation
+### Development Benefits
+- **Simplified Authentication**: Standard AWS credentials
+- **Better Documentation**: Comprehensive AWS SDK docs
+- **Ecosystem Integration**: Easy integration with other AWS services
+- **Regional Processing**: Data stays in specified AWS region
 
-### Nice-to-Have
-1. PWA installation
-2. Offline capability
-3. Advanced error handling
+## ⚠️ **Security & Best Practices**
 
-## ⚠️ **Security & Common Pitfalls**
+### AWS Security
+1. **IAM Permissions**: Only grant `textract:AnalyzeDocument` and `textract:DetectDocumentText`
+2. **Access Key Rotation**: Regular rotation of credentials
+3. **Environment Separation**: Different AWS accounts for dev/staging/prod
+4. **Cost Monitoring**: Set up billing alerts for unexpected charges
 
-### Security Rules
-1. **Never commit `.env.local`** - Always in `.gitignore`
-2. **Use environment variables** - Never hardcode credentials
-3. **Azure key rotation** - Use secure storage in production
-
-### Development Pitfalls
-1. **Over-engineering**: Keep components simple for MVP
-2. **Desktop-first thinking**: Always test on mobile devices
-3. **Complex state management**: Use React state and localStorage
-4. **Perfect OCR expectation**: Build robust editing interface
-5. **Feature creep**: Stick to core logbook conversion only
+### Development Guidelines
+1. **Never commit credentials** - Always use environment variables
+2. **Test with real data** - Use actual handwritten logbook samples
+3. **Mobile-first testing** - Always test on actual mobile devices
+4. **Cost awareness** - Monitor AWS Textract usage during development
 
 ## 🧪 **Testing Strategy**
 
-### Manual Testing
-- Real handwritten logbook samples
-- Various mobile devices and browsers
-- Different lighting conditions for camera
-- Edge cases in handwriting recognition
+### OCR Testing
+- Various handwriting styles and quality
+- Different logbook formats and layouts
+- Edge cases (poor lighting, skewed images)
+- Table detection accuracy
 
-### Automated Testing
-- OCR response parsing
-- CSV format validation
-- Component rendering
-- Error boundary functionality
+### Integration Testing
+- Camera functionality across browsers
+- AWS credential validation
+- Error handling for network issues
+- CSV export format validation
 
-## 📝 **Development Notes**
+## 📝 **Development Workflow**
 
-- Focus on the pilot user experience
-- Prioritize mobile performance
-- Keep Azure costs minimal during development
-- Use real logbook images for testing
-- Gather early user feedback from pilots
-- Document OCR accuracy improvements
+### Local Development
+1. Run AWS setup script: `./setup-aws.sh`
+2. Install dependencies: `npm install`
+3. Start dev server: `npm run dev`
+4. Test on mobile devices via ngrok/tunnel
+
+### Deployment Options
+1. **AWS S3 + CloudFront** (recommended)
+2. **Vercel** (works out of the box)
+3. **Netlify** (static export compatible)
+
+## 🎯 **Current Feature Status**
+
+### ✅ Completed (v2.0 AWS Edition)
+- AWS Textract integration with table/form detection
+- Mobile camera capture and image processing
+- Interactive data review and editing
+- ForeFlight CSV export functionality
+- Enhanced bounding box-aware parsing
+- Cost-efficient AWS implementation
+
+### 🔄 In Progress
+- Advanced table structure recognition
+- Custom Textract queries for aviation data
+- Enhanced error handling and user feedback
+
+### 📋 Planned
+- Amazon A2I integration for human review
+- Custom model training for logbook layouts
+- Progressive Web App enhancements
+- Offline functionality improvements
+
+---
+
+**Remember**: Focus on the pilot user experience, prioritize mobile performance, and leverage AWS Textract's superior table detection capabilities for better logbook parsing accuracy! ✈️

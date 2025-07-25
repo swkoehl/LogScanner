@@ -1,10 +1,11 @@
-// Configuration for LogScanner MVP
+// Configuration for LogScanner using AWS Textract
 // Validates environment variables at runtime
 
 export const config = {
-  azure: {
-    endpoint: process.env.AZURE_COMPUTER_VISION_ENDPOINT || process.env.NEXT_PUBLIC_AZURE_COMPUTER_VISION_ENDPOINT,
-    key: process.env.AZURE_COMPUTER_VISION_KEY || process.env.NEXT_PUBLIC_AZURE_COMPUTER_VISION_KEY,
+  aws: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION || process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1',
   },
   app: {
     environment: process.env.NEXT_PUBLIC_APP_ENV || 'development',
@@ -14,26 +15,27 @@ export const config = {
 // Runtime validation
 export function validateConfig() {
   console.log('Environment check:', {
-    serverEndpoint: process.env.AZURE_COMPUTER_VISION_ENDPOINT,
-    publicEndpoint: process.env.NEXT_PUBLIC_AZURE_COMPUTER_VISION_ENDPOINT,
-    serverKey: process.env.AZURE_COMPUTER_VISION_KEY ? 'SET' : 'NOT_SET',
-    publicKey: process.env.NEXT_PUBLIC_AZURE_COMPUTER_VISION_KEY ? 'SET' : 'NOT_SET',
-    finalEndpoint: config.azure.endpoint,
-    finalKey: config.azure.key ? 'SET' : 'NOT_SET',
-    allEnvKeys: typeof window === 'undefined' ? Object.keys(process.env).filter(k => k.includes('AZURE')) : 'CLIENT_SIDE'
+    serverAccessKeyId: process.env.AWS_ACCESS_KEY_ID ? 'SET' : 'NOT_SET',
+    publicAccessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID ? 'SET' : 'NOT_SET',
+    serverSecretKey: process.env.AWS_SECRET_ACCESS_KEY ? 'SET' : 'NOT_SET',
+    publicSecretKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY ? 'SET' : 'NOT_SET',
+    finalAccessKeyId: config.aws.accessKeyId ? 'SET' : 'NOT_SET',
+    finalSecretKey: config.aws.secretAccessKey ? 'SET' : 'NOT_SET',
+    region: config.aws.region,
+    allEnvKeys: typeof window === 'undefined' ? Object.keys(process.env).filter(k => k.includes('AWS')) : 'CLIENT_SIDE'
   });
 
-  if (!config.azure.endpoint || !config.azure.key) {
-    console.error('Azure credentials missing:', {
-      endpoint: !!config.azure.endpoint,
-      key: !!config.azure.key
+  if (!config.aws.accessKeyId || !config.aws.secretAccessKey) {
+    console.error('AWS credentials missing:', {
+      accessKeyId: !!config.aws.accessKeyId,
+      secretAccessKey: !!config.aws.secretAccessKey,
+      region: config.aws.region
     });
-    throw new Error('Missing Azure Computer Vision credentials. Please check your environment variables.');
+    throw new Error('Missing AWS credentials. Please check your environment variables.');
   }
   
-  if (!config.azure.endpoint.includes('api.cognitive.microsoft.com')) {
-    console.error('Invalid endpoint format:', config.azure.endpoint);
-    throw new Error('Invalid Azure Computer Vision endpoint format.');
+  if (!config.aws.region) {
+    console.warn('AWS region not specified, using default: us-east-1');
   }
   
   return true;
