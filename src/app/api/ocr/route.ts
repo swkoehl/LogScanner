@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { processImageOCR } from '@/lib/azure-ocr';
+import { processImageOCR } from '@/lib/aws-textract';
 
 export async function POST(request: NextRequest) {
   try {

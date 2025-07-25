@@ -2,17 +2,23 @@
 
 > **Mission**: Transform handwritten pilot logbooks into digital ForeFlight-compatible CSV files using AI-powered OCR technology.
 
-## 📊 **Current Status (v1.0 MVP)**
+## 📊 **Current Status (v2.0 AWS Edition)**
 
 ### ✅ **Completed Features**
 - ✅ Mobile-first PWA with camera capture
-- ✅ Azure Computer Vision OCR integration
+- ✅ AWS Textract OCR integration with enhanced table/form detection
 - ✅ Real-time OCR processing with handwriting recognition
 - ✅ Interactive data review and editing interface  
 - ✅ ForeFlight CSV export functionality
 - ✅ Responsive design optimized for mobile devices
 - ✅ Enhanced text readability and user experience
-- ✅ **Phase 1 OCR Improvements** (Just Implemented!)
+- ✅ **AWS Migration Complete** (v2.0)
+  - ✅ Replaced Azure Computer Vision with AWS Textract
+  - ✅ Enhanced table and form detection capabilities
+  - ✅ Improved cost efficiency with AWS free tier
+  - ✅ Better structured data extraction
+  - ✅ Simplified deployment with AWS ecosystem
+- ✅ **Phase 1 OCR Improvements**
   - ✅ Image preprocessing for better OCR accuracy
   - ✅ Bounding box-aware column parsing
   - ✅ Structural logbook understanding
@@ -24,11 +30,11 @@
 ## 🎯 **Phase 2: Advanced OCR Training & Accuracy (Next 2-4 weeks)**
 
 ### **2.1 Custom Model Training**
-- [ ] **Azure Custom Vision Integration**
-  - Create custom logbook recognition project
-  - Train model on 50-100 labeled logbook samples
-  - Implement region-specific field detection (date, aircraft, route, times)
-  - Deploy custom model endpoint
+- [ ] **AWS Custom Model Training**
+  - Use Amazon Textract Custom Queries for logbook-specific fields
+  - Implement Amazon Augmented AI (A2I) for human review loops
+  - Train custom document understanding models
+  - Optimize for aviation logbook layouts
 
 - [ ] **Training Data Pipeline**
   ```typescript
@@ -247,8 +253,8 @@
 ## 💰 **Cost Optimization Strategy**
 
 ### **Current Costs (F0 Tier)**
-- Azure Computer Vision: $0 (first 20K transactions free)
-- Azure Static Web Apps: $0 (free tier)
+- AWS Textract: $0 (first 1K pages free, then $1.50/1K pages)
+- AWS S3 + CloudFront: $0-5/month (typical usage)
 - GitHub Actions: $0 (public repo)
 
 ### **Scaling Strategy**
